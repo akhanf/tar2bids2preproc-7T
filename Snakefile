@@ -1,4 +1,5 @@
 from snakemake.io import glob_wildcards,strip_wildcard_constraints,get_wildcard_names
+import snakebids
 
 configfile: 'config.yml'
 
@@ -143,10 +144,50 @@ def get_gradcorrect(wildcards):
     checkpointrule = checkpoints.gradcorrect_extra.get(**wildcards)
     return 'gradcorrect'
 
-      
+
+
+def get_freesurfer_inputs(wildcards):
+    
+    checkpointrule = checkpoints.gradcorrect_extra.get(**wildcards)
+
+    #bids exists at this point, so we can parse it 
+    bids_inputs = snakebids.generate_inputs('gradcorrect',config['pybids_inputs_freesurfer'],
+                participant_label=wildcards.subject,use_bids_inputs=True)
+
+    t1_path = bids_inputs.input_path['T1w']
+    subj_zip_list = snakebids.filter_list(bids_inputs.input_zip_lists['T1w'], wildcards)
+
+    return expand(t1_path,zip,**subj_zip_list)
+                            
+
+
+rule freesurfer_subj:
+    input:
+        t1w = get_freesurfer_inputs
+    params:
+        in_args = lambda wildcards, input: ' '.join( f'-i {img}' for img in input.t1w ),
+        subjects_dir = 'freesurfer'
+    output:
+        'freesurfer/sub-{subject}'
+    threads: 8
+    resources: 
+        mem_mb=32000,
+        time=1440
+    shadow: 'minimal'
+    container: config['singularity']['freesurfer']
+    shell: 
+        'recon-all -threads 8 -sd {params.subjects_dir} {params.in_args} '
+        '-subjid {wildcards.subject} -parallel -hires -all '
+        
+
+
 rule fmriprep_subj:
     input:
-        get_gradcorrect
+        gradcorrect=get_gradcorrect,
+        freesurfer='freesurfer/sub-{subject}'
+    params:
+        fs_subjects_dir='freesurfer',
+        fs_license_file=config['fs_license_file']
     output:
         directory('fmriprep/sub-{subject}'),
         dd='fmriprep-extra/sub-{subject}_dataset_description.json'
@@ -159,7 +200,11 @@ rule fmriprep_subj:
         mem_mb=32000,
         time=360
     shell: 
-        'fmriprep gradcorrect fmriprep participant --participant_label {wildcards.subject} && ' 
+        'fmriprep {input.gradcorrect} fmriprep participant --participant_label {wildcards.subject} '
+        '--nthreads {threads} --n_cpus {threads} --mem_mb {resources.mem_mb} --omp-nthreads {threads} '
+        '--fs-license-file {params.fs_license_file} --fs-subjects-dir {params.fs_subjects_dir} --cifti-output '
+        '--notrack --output-layout bids --use-aroma '
+        '--output-spaces T1w MNI152NLin2009cAsym MNI152NLin6Asym && ' 
         'cp fmriprep/dataset_description.json {output.dd}'
 
 checkpoint fmriprep_extra:
@@ -171,5 +216,4 @@ checkpoint fmriprep_extra:
         'cp {input[0]} {output}'
 
     
-        
- 
+
