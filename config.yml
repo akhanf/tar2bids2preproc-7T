@@ -9,3 +9,7 @@ tar_wildcards:
 
 singularity:
   tar2bids: '/srv/containers/tar2bids_v0.0.6b.sif'
+  gradcorrect: '/home/ROBARTS/alik/graham/singularity/bids-apps/khanlab_gradcorrect_v0.0.3.sif'
+  fmriprep: '/srv/containers/fmriprep_20.2.6.sif'
+
+grad_coeff_file: 'coeff_AC84.grad'

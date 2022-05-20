@@ -16,10 +16,17 @@ def get_tarfile(wildcards):
         fmt_dict[tar_wc] = getattr(globtar,tar_wc)[idx]
     return config['tarfile'].format(**fmt_dict)
 
+rule all_fmriprep:
+    input:
+        'fmriprep/dataset_description.json'
+
 rule all_bids:
     input: 
         'bids/code/validator_output.txt',
 
+rule all_gradcorrect:
+    input:
+        'gradcorrect/dataset_description.json'
 
 rule link_tarfile:
     input:
@@ -35,9 +42,9 @@ rule tar2bids:
         heuristic='cfmm_bold_rest.py'
     output: 
         subject_dir=directory('bids/sub-{subject}'),
-        participants_tsv=temp('bids/sub-{subject}_participants.tsv'),
-        bidsignore=temp('bids/sub-{subject}_bidsignore'),
-        dd=temp('bids/sub-{subject}_dataset_description.json'),
+        participants_tsv='bids-extra/sub-{subject}_participants.tsv',
+        bidsignore='bids-extra/sub-{subject}_bidsignore',
+        dd='bids-extra/sub-{subject}_dataset_description.json',
     container: config['singularity']['tar2bids']
     shadow: 'minimal'
     shell: 
@@ -77,9 +84,9 @@ rule merge_participants_tsv:
         participants_tsv='bids/participants.tsv'
     shell:
         'echo participant_id > {output} && '
-        'grep -h sub {input} | uniq | sort >> {output}'
+        'grep -h sub {input} | sort | uniq >> {output}'
     
-rule validator:
+checkpoint validator:
     input: 
         'bids/participants.tsv',
         'bids/.bidsignore',
@@ -89,5 +96,60 @@ rule validator:
     container: config['singularity']['tar2bids']
     shell: 'bids-validator bids | tee {output}'
 
+def get_bids(wildcards):
+    checkpointrule = checkpoints.validator.get(**wildcards)
+    return 'bids'
 
+ 
+rule gradcorrect_subj:
+    input:
+        get_bids,
+        coeff=config['grad_coeff_file']
+    output:
+        directory('gradcorrect/sub-{subject}')
+    shadow:
+        'minimal'
+    container: config['singularity']['gradcorrect']
+    log: 'logs/gradcorrect_sub-{subject}.txt'
+    shell:
+        '/gradcorrect/run.sh bids gradcorrect participant --participant_label {wildcards.subject} --grad_coeff_file {input.coeff} &> {log}'
+        
 
+checkpoint gradcorrect_extra:
+    input:
+        expand('gradcorrect/sub-{subject}',subject=subjects),
+        bidsfiles=multiext('bids/','participants.tsv','.bidsignore','dataset_description.json')
+    output:
+        bidsfiles=multiext('gradcorrect/','participants.tsv','.bidsignore','dataset_description.json')
+    run:
+        for i,o in zip(input.bidsfiles,output.bidsfiles):
+            shell('cp {i} {o}')
+        
+def get_gradcorrect(wildcards):
+    checkpointrule = checkpoints.gradcorrect_extra.get(**wildcards)
+    return 'gradcorrect'
+
+      
+rule fmriprep_subj:
+    input:
+        get_gradcorrect
+    output:
+        directory('fmriprep/sub-{subject}'),
+        dd='fmriprep-extra/sub-{subject}_dataset_description.json'
+    container: config['singularity']['fmriprep']
+    shadow: 'minimal'
+    shell: 
+        'fmriprep gradcorrect fmriprep participant --participant_label {wildcards.subject} && ' 
+        'cp fmriprep/dataset_description.json {output.dd}'
+
+checkpoint fmriprep_extra:
+    input:
+        dd=expand(rules.fmriprep_subj.output.dd,subject=subjects)
+    output:
+        dd='fmriprep/dataset_description.json'
+    shell:
+        'cp {input[0]} {output}'
+
+    
+        
+ 
