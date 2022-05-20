@@ -1,4 +1,4 @@
-from snakemake.io import glob_wildcards,strip_wildcard_constraints
+from snakemake.io import glob_wildcards,strip_wildcard_constraints,get_wildcard_names
 
 configfile: 'config.yml'
 
@@ -9,12 +9,12 @@ subjects = globtar.subject
 
 def get_tarfile(wildcards):
     subject = wildcards.subject    
+
     idx = globtar.subject.index(subject)
 
-    fmt_dict = {'subject': subject}
-
-    for tar_wc in config['tar_wildcards']:
+    for tar_wc in get_wildcard_names(config['tarfile']):
         fmt_dict[tar_wc] = getattr(globtar,tar_wc)[idx]
+
     return strip_wildcard_constraints(config['tarfile']).format(**fmt_dict)
 
 rule all_fmriprep:
@@ -121,10 +121,10 @@ rule gradcorrect_subj:
     container: config['singularity']['gradcorrect']
     log: 'logs/gradcorrect_sub-{subject}.txt'
     benchmark: 'benchmarks/gradcorrect_sub-{subject}.tsv'
-    threads: 8
+    threads: 4
     resources: 
-        mem_mb=32000,
-        time=60
+        mem_mb=16000,
+        time=180
     shell:
         '/gradcorrect/run.sh bids gradcorrect participant --participant_label {wildcards.subject} --grad_coeff_file {input.coeff} &> {log}'
         
