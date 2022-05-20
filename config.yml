@@ -1,0 +1,11 @@
+tarfile: 'tarfiles/{pi}_{project}_{date}_{prefix}_{subject}_{suffix}.tar'
+
+tar_wildcards:
+ - pi
+ - project
+ - date
+ - prefix
+ - suffix
+
+singularity:
+  tar2bids: '/srv/containers/tar2bids_v0.0.6b.sif'
