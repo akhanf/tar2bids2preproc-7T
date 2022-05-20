@@ -1,6 +1,7 @@
-from snakemake.io import glob_wildcards
+from snakemake.io import glob_wildcards,strip_wildcard_constraints
 
 configfile: 'config.yml'
+
 
 globtar = glob_wildcards(config['tarfile'])
 
@@ -14,7 +15,7 @@ def get_tarfile(wildcards):
 
     for tar_wc in config['tar_wildcards']:
         fmt_dict[tar_wc] = getattr(globtar,tar_wc)[idx]
-    return config['tarfile'].format(**fmt_dict)
+    return strip_wildcard_constraints(config['tarfile']).format(**fmt_dict)
 
 rule all_fmriprep:
     input:
@@ -27,6 +28,8 @@ rule all_bids:
 rule all_gradcorrect:
     input:
         'gradcorrect/dataset_description.json'
+
+localrules: link_tarfile,merge_bidsignore,merge_dataset_description,merge_participants_tsv,validator
 
 rule link_tarfile:
     input:
@@ -46,7 +49,13 @@ rule tar2bids:
         bidsignore='bids-extra/sub-{subject}_bidsignore',
         dd='bids-extra/sub-{subject}_dataset_description.json',
     container: config['singularity']['tar2bids']
+    log: 'logs/tar2bids_sub-{subject}.txt'
+    benchmark: 'benchmarks/tar2bids_sub-{subject}.tsv'
     shadow: 'minimal'
+    threads: 8
+    resources: 
+        mem_mb=32000,
+        time=60
     shell: 
         "/opt/tar2bids/tar2bids -h {params.heuristic} "
         " -T 'sub-{{subject}}' {input} && "
@@ -65,7 +74,7 @@ rule merge_bidsignore:
     shell:
         'cp {input[0]} {output} '
 
-rule merge_datasetdescription:
+rule merge_dataset_description:
     """just gets the first dataset_description, since safe to assume all will be the same
         TODO: create this from config.yml"""
 
@@ -111,6 +120,11 @@ rule gradcorrect_subj:
         'minimal'
     container: config['singularity']['gradcorrect']
     log: 'logs/gradcorrect_sub-{subject}.txt'
+    benchmark: 'benchmarks/gradcorrect_sub-{subject}.tsv'
+    threads: 8
+    resources: 
+        mem_mb=32000,
+        time=60
     shell:
         '/gradcorrect/run.sh bids gradcorrect participant --participant_label {wildcards.subject} --grad_coeff_file {input.coeff} &> {log}'
         
@@ -138,6 +152,12 @@ rule fmriprep_subj:
         dd='fmriprep-extra/sub-{subject}_dataset_description.json'
     container: config['singularity']['fmriprep']
     shadow: 'minimal'
+    benchmark: 'benchmarks/fmriprep_sub-{subject}.tsv'
+    log: 'logs/fmriprep_sub-{subject}.txt'
+    threads: 8
+    resources: 
+        mem_mb=32000,
+        time=360
     shell: 
         'fmriprep gradcorrect fmriprep participant --participant_label {wildcards.subject} && ' 
         'cp fmriprep/dataset_description.json {output.dd}'
