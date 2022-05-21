@@ -1,0 +1,35 @@
+from snakemake.io import glob_wildcards,strip_wildcard_constraints,get_wildcard_names
+import snakebids
+
+configfile: 'config.yml'
+
+
+globtar = glob_wildcards(config['tarfile'])
+
+subjects = globtar.subject
+
+for s in config['exclude_subjects']:
+    subjects.remove(s)
+
+rule all_fmriprep:
+    input:
+        'fmriprep/dataset_description.json'
+
+rule all_gradcorrect:
+    input:
+        'gradcorrect/dataset_description.json'
+
+rule all_validator:
+    input: 
+        'bids/code/validator_output.txt',
+
+rule all_bids:
+    input: 
+        'bids/dataset_description.json'
+
+
+include: 'rules/tar2bids.smk'
+include: 'rules/gradcorrect.smk'
+include: 'rules/freesurfer.smk'
+include: 'rules/fmriprep.smk'
+

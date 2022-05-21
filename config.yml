@@ -2,6 +2,9 @@ tarfile: 'tarfiles/{pi,[a-zA-Z]+}_{project,[a-zA-Z]+}_{date,\d{8}}_{prefix}_{sub
 
 heuristic: 'resources/cfmm_bold_rest_mirsattari.py'
 
+exclude_subjects:
+ - SZ13
+
 singularity:
   tar2bids: 'docker://khanlab/tar2bids:v0.1.3'
   gradcorrect: 'docker://khanlab/gradcorrect:v0.0.3'
@@ -11,6 +14,7 @@ singularity:
 
 grad_coeff_file: '/project/ctb-akhanf/akhanf/opt/grad/.coeff_AC84.grad'
 fs_license_file: '/project/ctb-akhanf/akhanf/opt/freesurfer/.license'
+
 
 pybids_inputs_freesurfer:
   T1w:
