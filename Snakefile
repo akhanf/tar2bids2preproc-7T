@@ -8,11 +8,13 @@ globtar = glob_wildcards(config['tarfile'])
 
 subjects = globtar.subject
 
+subjects.remove('SZ13')
+
 def get_tarfile(wildcards):
     subject = wildcards.subject    
 
     idx = globtar.subject.index(subject)
-
+    fmt_dict = dict()
     for tar_wc in get_wildcard_names(config['tarfile']):
         fmt_dict[tar_wc] = getattr(globtar,tar_wc)[idx]
 
@@ -41,9 +43,10 @@ rule link_tarfile:
         'ln -srv {input} {output}'
 
 rule tar2bids:
-    input: rules.link_tarfile.output
+    input: 
+        tarfile=rules.link_tarfile.output,
+        heuristic=config['heuristic']
     params:
-        heuristic='cfmm_bold_rest.py'
     output: 
         subject_dir=directory('bids/sub-{subject}'),
         participants_tsv='bids-extra/sub-{subject}_participants.tsv',
@@ -58,8 +61,8 @@ rule tar2bids:
         mem_mb=32000,
         time=60
     shell: 
-        "/opt/tar2bids/tar2bids -h {params.heuristic} "
-        " -T 'sub-{{subject}}' {input} && "
+        "/opt/tar2bids/tar2bids -h {input.heuristic} "
+        " -T 'sub-{{subject}}' {input.tarfile} && "
         " cp -v bids/participants.tsv {output.participants_tsv} && "
         " cp -v bids/.bidsignore {output.bidsignore} && "
         " cp -v bids/dataset_description.json {output.dd}"
