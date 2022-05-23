@@ -2,8 +2,6 @@ tarfile: 'tarfiles/{pi,[a-zA-Z]+}_{project,[a-zA-Z]+}_{date,\d{8}}_{prefix}_{sub
 
 heuristic: 'resources/cfmm_bold_rest_mirsattari.py'
 
-exclude_subjects:
- - SZ13
 
 singularity:
   tar2bids: 'docker://khanlab/tar2bids:v0.1.3'

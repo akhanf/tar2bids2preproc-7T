@@ -8,8 +8,6 @@ globtar = glob_wildcards(config['tarfile'])
 
 subjects = globtar.subject
 
-for s in config['exclude_subjects']:
-    subjects.remove(s)
 
 rule all_fmriprep:
     input:
