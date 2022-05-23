@@ -75,7 +75,7 @@ rule merge_dataset_description:
     output:
         dataset_description='bids/dataset_description.json'
     shell:
-        'cp {input[0]} {output} '
+        'cp {input.dataset_description[0]} {output.dataset_description} '
 
    
 checkpoint validator:
